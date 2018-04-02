@@ -51,7 +51,10 @@ func processTag(tag string) error {
 
 	// If the tag is empty, it marks the close of the last tag - bring up
 	// the selector interface to choose which lines to feed to the formatter.
-	ll := []*types.LineDesc{}
+	ll := []*types.LineDesc{
+		types.NewLineDesc("Line 1", "This is line one"),
+		types.NewLineDesc("Line 2", "This is line two"),
+	}
 
 	// If the "-<output>" option is specified, the selected lines are passed
 	// down to each appropriate <output> plugin.  For example:
@@ -73,8 +76,6 @@ func main() {
 	default:
 		err = fmt.Errorf("invalid command specified\n%s", cUsageStr)
 	}
-
-	emitter.DumpFactory()
 
 	if err != nil {
 		fmt.Printf("Fatal error: %s\n", err.Error())
