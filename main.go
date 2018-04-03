@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
+	"time"
 
 	"github.com/sabhiram/hist/types"
 
@@ -76,8 +78,50 @@ func main() {
 		if err != nil && err == io.EOF {
 			break
 		}
-		lds = append(lds, types.NewLineDesc(l, fmt.Sprintf("Line number %d", i)))
+		msg := fmt.Sprintf("Count = %d", i)
+		lds = append([]*types.LineDesc{types.NewLineDesc(l, msg)}, lds...)
 	}
+
+	i := 0
+	for i = 0; i < len(lds); i++ {
+		h := lds[i]
+		t := strings.Split(strings.Trim(h.Line, " "), " ")
+		arr := []string{}
+		for _, v := range t {
+			if len(v) > 0 {
+				arr = append(arr, v)
+			}
+		}
+		cmd := arr[1]
+		h.Line = strings.Join(arr[1:], " ")
+		if cmd == "hist" {
+			fmt.Printf("Trying cmd = %s\n", h.Line)
+			fi := strings.Index(h.Line, "-tag")
+			if fi < 0 {
+				fi = strings.Index(h.Line, "-t")
+			} else {
+				fi += 3
+			}
+			if fi < 0 {
+				fmt.Printf("No tag found, but hist command\n")
+				break
+			} else {
+				fi += 1
+			}
+			if h.Line[fi] == ' ' || h.Line[fi] == '=' {
+				fi += 1
+			}
+			items := strings.Split(h.Line[fi:], " ")
+			tv := items[0]
+			fmt.Printf("Found tag set: %s\n", tv)
+		}
+
+		fmt.Printf("%d ==> %s\n", i, h.Line)
+		<-time.After(1 * time.Second)
+	}
+
+	// Trim
+	lds = lds[0:i]
 
 	// If the "-<output>" option is specified, the selected lines are passed
 	// down to each appropriate <output> plugin.  For example:
