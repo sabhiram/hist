@@ -3,7 +3,6 @@ package emitter
 ////////////////////////////////////////////////////////////////////////////////
 
 import (
-	"bytes"
 	"errors"
 	"flag"
 	"fmt"
@@ -50,18 +49,13 @@ func RegisterEmitter(name, key, short string, emit EmitFunc, en bool) {
 // ParseArgs parses all args for any and all registered emitters in the factory.
 // Returns a slice of stings that were not parsed by any of the registered
 // parsers.
-func ParseArgs(args []string) ([]string, error) {
-	fs := flag.NewFlagSet("emitter-parser", flag.ContinueOnError)
-	fs.SetOutput(bytes.NewBuffer([]byte{})) // Mute output from flagset
-
+func ParseArgs(fs *flag.FlagSet) error {
 	for _, e := range factory {
 		usage := fmt.Sprintf("enable output to %s", e.name)
 		fs.BoolVar(&e.enabled, e.key, false, usage)
 		fs.BoolVar(&e.enabled, e.short, false, usage+" (short)")
 	}
-
-	fs.Parse(args)
-	return fs.Args(), nil
+	return nil
 }
 
 // EmitEnabled emits all enabled and registered output emitters by processing

@@ -3,9 +3,11 @@ package main
 ////////////////////////////////////////////////////////////////////////////////
 
 import (
+	"bufio"
+	"flag"
 	"fmt"
+	"io"
 	"os"
-	"strings"
 
 	"github.com/sabhiram/hist/types"
 
@@ -16,44 +18,65 @@ import (
 ////////////////////////////////////////////////////////////////////////////////
 
 const (
-	cUsageStr = `usage: hist [<cmd> [options]]
-
+	cUsageStr = `usage: [history |] hist [-tag <t> [-outputs]] [-version]
 If "cmd" is empty, it runs the "tag" command (see below).  Valid commands 
 include:
 
-	tag <val>	-	Set the start of a tag block with the string "<val>".  If 
-					"<val>" is not specified, the previous tag is closed.  On 
-					close of a tag, if outputs are specified via "-<output>",
-					the respective files will be emitted.
+	-tag <val>	-	Set the start of a tag block with the string "<val>".  
+	-version 	- 	Print the version of the "hist" tool.
 
-	version		- 	Print the version of the "hist" tool.
+If the "-tag" is specified it is recorded.  If the shell history is piped
+into the program, it seek until the last tag in the history (unless the 
+"-tag" is specified on output as well).
 `
-	cCmdEmpty   = ""
-	cCmdTag     = "tag"
-	cCmdVersion = "version"
 )
 
 var (
 	cli = struct {
-		cmd string // command to invoke for the `hist` tool
-		tag string // tag value to add to history
+		tag     string // tag value to add to history
+		version bool   // print app version
 	}{}
 )
 
 ////////////////////////////////////////////////////////////////////////////////
 
-func processTag(tag string) error {
-	// If the tag is set, remember it and we are done, the shell's history
-	// will do the heavy lifting.
-	if len(tag) > 0 {
-		return nil
+func fatalOnError(err error) {
+	if err != nil {
+		fmt.Printf("Fatal error: %s\n", err.Error())
+		os.Exit(1)
+	}
+}
+
+func main() {
+	if cli.version {
+		fmt.Printf("Version: %s\n", Version)
+		os.Exit(0)
 	}
 
-	// If the tag is empty, it marks the close of the last tag - bring up
-	// the selector interface to choose which lines to feed to the formatter.
-	ll := []*types.LineDesc{
-		types.NewLineDesc("Line 1", "This is line one"),
-		types.NewLineDesc("Line 2", "This is line two"),
+	// Check stdin
+	info, err := os.Stdin.Stat()
+	fatalOnError(err)
+
+	// If the tag is set, remember it and we are done, the shell's history
+	// will do the heavy lifting.
+	if info.Size() == 0 {
+		return
+	}
+
+	// Read stdin.
+	// TODO:
+	// 1. If we find the specified tag, then we are done and we have the list
+	// 	  of items we need to emit.
+	// 2. If the tag is not set, we go until we find the last tag of the hist
+	//	  tool in the history buffer.
+	r := bufio.NewReader(os.Stdin)
+	lds := []*types.LineDesc{}
+	for i := 1; true; i++ {
+		l, err := r.ReadString('\n')
+		if err != nil && err == io.EOF {
+			break
+		}
+		lds = append(lds, types.NewLineDesc(l, fmt.Sprintf("Line number %d", i)))
 	}
 
 	// If the "-<output>" option is specified, the selected lines are passed
@@ -61,44 +84,22 @@ func processTag(tag string) error {
 	//   "-go" will invoke the `go` plugin which emits go exec statements.
 	//   "-md" will invoke the `markdown` plugin to render markdown.
 	//   "-console" will dump commented console versions of the scripts.
-	return emitter.EmitEnabled(ll)
-}
-
-////////////////////////////////////////////////////////////////////////////////
-
-func main() {
-	var err error
-	switch cli.cmd {
-	case cCmdEmpty, cCmdTag:
-		err = processTag(cli.tag)
-	case cCmdVersion:
-		fmt.Printf(Version)
-	default:
-		err = fmt.Errorf("invalid command specified\n%s", cUsageStr)
-	}
-
-	if err != nil {
-		fmt.Printf("Fatal error: %s\n", err.Error())
-		os.Exit(1)
-	}
+	err = emitter.EmitEnabled(lds)
+	fatalOnError(err)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
 func init() {
-	args, err := emitter.ParseArgs(os.Args[1:])
-	if err != nil {
-		fmt.Printf("Fatal error: %s\n", err.Error())
-		os.Exit(1)
-	}
+	fs := flag.NewFlagSet("hist", flag.ExitOnError)
+	fs.StringVar(&cli.tag, "tag", "", "tag value to set in the history")
+	fs.StringVar(&cli.tag, "t", "", "tag value to set in the history (short)")
+	fs.BoolVar(&cli.version, "version", false, "print the version of this tool")
+	fs.BoolVar(&cli.version, "v", false, "print the version of this tool (short)")
 
-	if len(args) > 0 {
-		cli.cmd = strings.ToLower(args[0])
-	} else {
-		cli.cmd = cCmdTag
-	}
+	// Allow any registered emitters to tie in their args
+	fatalOnError(emitter.ParseArgs(fs))
 
-	if len(args) > 1 {
-		cli.tag = args[1]
-	}
+	// Parse args.
+	fatalOnError(fs.Parse(os.Args[1:]))
 }
