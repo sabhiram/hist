@@ -16,14 +16,15 @@ go get github.com/sabhiram/hist
 ## Usage
 
 ```
-$ hist [<cmd> [options]]
+$ history | hist [-tag <t> [-outputs]] [-version]
 
 If "cmd" is empty, it runs the "tag" command (see below).  Valid commands 
 include:
 
-	tag <val>	-	Set the start of a tag block with the string "<val>".  If 
-					"<val>" is not specified, the previous tag is closed.
+	-tag <val>	-	Set the start of a tag block with the string "<val>".  
+	-version 	- 	Print the version of the "hist" tool.
 
-	version		- 	Print the version of the "hist" tool.
+If the "-tag" is specified it is recorded.  If the shell history is piped
+into the program, it seek until the last tag in the history (unless the 
+"-tag" is specified on output as well).
 ```	
-
