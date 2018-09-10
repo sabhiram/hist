@@ -9,7 +9,6 @@ import (
 	"io"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/sabhiram/hist/types"
 
@@ -21,15 +20,15 @@ import (
 
 const (
 	cUsageStr = `usage: [history |] hist [-tag <t> [-outputs]] [-version]
-If "cmd" is empty, it runs the "tag" command (see below).  Valid commands 
+If "cmd" is empty, it runs the "tag" command (see below).  Valid commands
 include:
 
-	-tag <val>	-	Set the start of a tag block with the string "<val>".  
+	-tag <val>	-	Set the start of a tag block with the string "<val>".
 	-version 	- 	Print the version of the "hist" tool.
 
 If the "-tag" is specified it is recorded.  If the shell history is piped
-into the program, it seek until the last tag in the history (unless the 
-"-tag" is specified on output as well).
+into the program, it is filtered until the last occurence of the tag "<val>"
+(unless the "-tag" is specified on output as well).
 `
 )
 
@@ -113,14 +112,15 @@ func main() {
 				break
 			}
 		}
-		<-time.After(100 * time.Millisecond)
 	}
 
-	// Trim and reverse.
+	// Trim till found tag.
 	lds = lds[0:i]
+
+	// Trim the most recent command and reverse the list
 	ln := len(lds)
-	for i := 0; i < ln/2; i++ {
-		lds[i], lds[ln-i-1] = lds[ln-i-1], lds[i]
+	for j := 1; j < ln/2; j++ {
+		lds[j], lds[ln-j-1] = lds[ln-j-1], lds[j]
 	}
 
 	// Emit any enabled emitters.
