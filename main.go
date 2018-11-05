@@ -32,11 +32,15 @@ into the program, it is filtered until the last occurence of the tag "<val>"
 `
 )
 
+////////////////////////////////////////////////////////////////////////////////
+
+type CLIArgs struct {
+	tag     string
+	version bool
+}
+
 var (
-	cli = struct {
-		tag     string // tag value to add to history
-		version bool   // print app version
-	}{}
+	cli = CLIArgs{}
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -46,6 +50,15 @@ func fatalOnError(err error) {
 		fmt.Printf("Fatal error: %s\n", err.Error())
 		os.Exit(1)
 	}
+}
+
+func getArgFlagSet(cli *CLIArgs) *flag.FlagSet {
+	fs := flag.NewFlagSet("hist", flag.ExitOnError)
+	fs.StringVar(&cli.tag, "tag", "", "tag value to set in the history")
+	fs.StringVar(&cli.tag, "t", "", "tag value to set in the history (short)")
+	fs.BoolVar(&cli.version, "version", false, "print the version of this tool")
+	fs.BoolVar(&cli.version, "v", false, "print the version of this tool (short)")
+	return fs
 }
 
 func main() {
@@ -76,7 +89,7 @@ func main() {
 		lds = append([]*types.LineDesc{types.NewLineDesc(l, msg)}, lds...)
 	}
 
-	tagv := ""
+	// tagv := ""
 	i := 0
 	for i = 0; i < len(lds); i++ {
 		h := lds[i]
@@ -84,29 +97,17 @@ func main() {
 		arr := []string{}
 		for _, v := range t {
 			if len(v) > 0 {
-				arr = append(arr, v)
+				arr = append(arr, strings.TrimSpace(v))
 			}
 		}
 		cmd := arr[1]
 		h.Line = strings.Join(arr[1:], " ")
 		if cmd == "hist" {
-			fi := strings.Index(h.Line, "-tag")
-			if fi < 0 {
-				fi = strings.Index(h.Line, "-t")
-			} else {
-				fi += 4
-			}
-			if fi < 0 {
-				break
-			} else {
-				fi += 2
-			}
-			if h.Line[fi] == ' ' || h.Line[fi] == '=' {
-				fi += 1
-			}
-			items := strings.Split(h.Line[fi:], " ")
-			tagv = strings.TrimSuffix(items[0], "\n")
-			if tagv == cli.tag {
+			h_cli := CLIArgs{}
+			fs := getArgFlagSet(&h_cli)
+			fs.Parse(arr[2:])
+
+			if h_cli.tag == cli.tag {
 				break
 			} else if cli.tag == "" {
 				break
@@ -131,15 +132,8 @@ func main() {
 ////////////////////////////////////////////////////////////////////////////////
 
 func init() {
-	fs := flag.NewFlagSet("hist", flag.ExitOnError)
-	fs.StringVar(&cli.tag, "tag", "", "tag value to set in the history")
-	fs.StringVar(&cli.tag, "t", "", "tag value to set in the history (short)")
-	fs.BoolVar(&cli.version, "version", false, "print the version of this tool")
-	fs.BoolVar(&cli.version, "v", false, "print the version of this tool (short)")
-
 	// Allow any registered emitters to tie in their args
+	fs := getArgFlagSet(&cli)
 	fatalOnError(emitter.ParseArgs(fs))
-
-	// Parse args.
 	fatalOnError(fs.Parse(os.Args[1:]))
 }
